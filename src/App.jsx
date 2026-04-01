@@ -23,25 +23,73 @@ export default function App() {
 
   const [selectedId, setSelectedId] = useState(null);
   const svgRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [dragInfo, setDragInfo] = useState(null);
 
-  // --- Local Storage Persistence ---
-
-  // Save apartment dimensions whenever they change
+  // --- Local Storage Persistence (Kept for convenient auto-save) ---
   useEffect(() => {
     localStorage.setItem('apartmentConfig', JSON.stringify(apartment));
   }, [apartment]);
 
-  // Save all elements whenever they change
   useEffect(() => {
     localStorage.setItem('apartmentElements', JSON.stringify(elements));
   }, [elements]);
+
+  // --- JSON Export / Import Handlers ---
+  const exportToJson = () => {
+    const data = {
+      apartment,
+      elements
+    };
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "apartment_layout.json";
+    document.body.appendChild(a);
+    a.click();
+
+    // Cleanup
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const importFromJson = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsedData = JSON.parse(event.target.result);
+        if (parsedData.apartment && parsedData.elements) {
+          setApartment(parsedData.apartment);
+          setElements(parsedData.elements);
+          setSelectedId(null);
+        } else {
+          alert("Invalid file format. Please upload a valid layout JSON.");
+        }
+      } catch (err) {
+        alert("Error parsing JSON file. The file might be corrupted.");
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input so the same file can be uploaded again if needed
+    e.target.value = null;
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
 
   const resetLayout = () => {
     if (window.confirm("Are you sure you want to reset the layout? This will delete all your current changes.")) {
       localStorage.removeItem('apartmentConfig');
       localStorage.removeItem('apartmentElements');
-      window.location.reload(); // Quick way to completely re-initialize state
+      window.location.reload();
     }
   };
 
@@ -177,6 +225,26 @@ export default function App() {
 
         {/* Scrollable Container */}
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
+
+          {/* File Operations */}
+          <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded border border-slate-200">
+            <h2 className="text-sm font-bold text-slate-700">File & Sync</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={exportToJson} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-100 text-slate-700 p-2 rounded text-xs border border-slate-300 font-medium transition-colors shadow-sm">
+                Export JSON
+              </button>
+              <button onClick={triggerFileInput} className="flex items-center justify-center gap-1 bg-white hover:bg-slate-100 text-slate-700 p-2 rounded text-xs border border-slate-300 font-medium transition-colors shadow-sm">
+                Import JSON
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={importFromJson}
+                accept=".json"
+                className="hidden"
+              />
+            </div>
+          </div>
 
           {/* Apartment Settings */}
           <div>

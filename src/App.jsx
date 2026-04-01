@@ -1,21 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 export default function App() {
-  // Global apartment/plot configuration
-  const [apartment, setApartment] = useState({ width: 1000, depth: 800 });
+  // Global apartment/plot configuration - initialized from local storage or default
+  const [apartment, setApartment] = useState(() => {
+    const saved = localStorage.getItem('apartmentConfig');
+    return saved ? JSON.parse(saved) : { width: 1000, depth: 800 };
+  });
 
-  // Elements array handles Rooms, Furniture, Doors, Windows
-  const [elements, setElements] = useState([
-    { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300 },
-    { id: 'room_2', type: 'room', shape: 'polygon', name: 'Custom Room', x: 500, y: 50, points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }] },
-    { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90 },
-    { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10 },
-    { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90 }
-  ]);
+  // Elements array handles Rooms, Furniture, Doors, Windows - initialized from local storage or default
+  const [elements, setElements] = useState(() => {
+    const saved = localStorage.getItem('apartmentElements');
+    if (saved) return JSON.parse(saved);
+
+    return [
+      { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300 },
+      { id: 'room_2', type: 'room', shape: 'polygon', name: 'Custom Room', x: 500, y: 50, points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }] },
+      { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90 },
+      { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10 },
+      { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90 }
+    ];
+  });
 
   const [selectedId, setSelectedId] = useState(null);
   const svgRef = useRef(null);
   const [dragInfo, setDragInfo] = useState(null);
+
+  // --- Local Storage Persistence ---
+
+  // Save apartment dimensions whenever they change
+  useEffect(() => {
+    localStorage.setItem('apartmentConfig', JSON.stringify(apartment));
+  }, [apartment]);
+
+  // Save all elements whenever they change
+  useEffect(() => {
+    localStorage.setItem('apartmentElements', JSON.stringify(elements));
+  }, [elements]);
+
+  const resetLayout = () => {
+    if (window.confirm("Are you sure you want to reset the layout? This will delete all your current changes.")) {
+      localStorage.removeItem('apartmentConfig');
+      localStorage.removeItem('apartmentElements');
+      window.location.reload(); // Quick way to completely re-initialize state
+    }
+  };
 
   // Helper to generate IDs
   const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -152,7 +180,12 @@ export default function App() {
 
           {/* Apartment Settings */}
           <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Apartment Layout</h1>
+            <div className="flex justify-between items-center mb-1">
+              <h1 className="text-xl font-bold text-slate-900">Apartment Layout</h1>
+              <button onClick={resetLayout} className="text-[10px] bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded border border-red-200 transition-colors">
+                Reset All
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mb-3">Define your total floor space (cm)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>

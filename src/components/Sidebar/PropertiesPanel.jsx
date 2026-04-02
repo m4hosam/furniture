@@ -83,21 +83,57 @@ export function PropertiesPanel({
           ) : (
             <div className="flex flex-col gap-2">
               <div className="text-xs text-blue-600 bg-blue-50 px-3 py-2.5 rounded-lg border border-blue-100 leading-relaxed">
-                Custom shape — drag the circular handles to reshape. Wall lengths update live.
+                Edit wall lengths below, or drag the handles on the canvas to reshape.
               </div>
-              {/* Live polygon edge lengths */}
+              {/* Editable polygon edge lengths */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-3 py-1.5 bg-slate-100 border-b border-slate-200">
+                <div className="px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Wall Lengths</span>
+                  <span className="text-xs text-slate-400">cm</span>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
                   {selectedEl.points.map((p, i) => {
-                    const next = selectedEl.points[(i + 1) % selectedEl.points.length];
-                    const len = Math.round(Math.sqrt((next.x - p.x) ** 2 + (next.y - p.y) ** 2) * 10) / 10;
+                    const points = selectedEl.points;
+                    const nextIdx = (i + 1) % points.length;
+                    const next = points[nextIdx];
+                    const dx = next.x - p.x;
+                    const dy = next.y - p.y;
+                    const len = Math.round(Math.sqrt(dx * dx + dy * dy) * 10) / 10;
+
+                    const commitLength = (rawVal) => {
+                      const newLen = parseFloat(rawVal);
+                      if (!newLen || newLen < 1 || Math.abs(newLen - len) < 0.05) return;
+                      const currentLen = Math.sqrt(dx * dx + dy * dy);
+                      if (currentLen === 0) return;
+                      const scale = newLen / currentLen;
+                      const newPoints = points.map((pt, idx) =>
+                        idx === nextIdx
+                          ? { x: p.x + dx * scale, y: p.y + dy * scale }
+                          : pt
+                      );
+                      onUpdate('points', newPoints);
+                    };
+
                     return (
-                      <div key={i} className="flex items-center justify-between px-3 py-1.5">
-                        <span className="text-xs text-slate-500 font-medium">Wall {i + 1}</span>
-                        <span className="text-xs font-bold text-blue-600 tabular-nums">{len} cm</span>
+                      <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                        <span className="text-xs text-slate-500 font-medium w-12 shrink-0">Wall {i + 1}</span>
+                        <input
+                          key={`wall-${selectedEl.id}-${i}-${len}`}
+                          id={`prop-wall-${i}`}
+                          type="number"
+                          defaultValue={len}
+                          min={1}
+                          step={1}
+                          onBlur={(e) => commitLength(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { commitLength(e.target.value); e.target.blur(); }
+                            if (e.key === 'Escape') { e.target.value = len; e.target.blur(); }
+                          }}
+                          className="flex-1 min-w-0 px-2 py-1 text-xs font-bold text-blue-600 tabular-nums
+                            border border-slate-200 rounded-md bg-white
+                            focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none
+                            transition-all hover:border-blue-300"
+                        />
                       </div>
                     );
                   })}

@@ -13,11 +13,11 @@ export default function App() {
     if (saved) return JSON.parse(saved);
 
     return [
-      { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300 },
-      { id: 'room_2', type: 'room', shape: 'polygon', name: 'Custom Room', x: 500, y: 50, points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }] },
-      { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90 },
-      { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10 },
-      { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90 }
+      { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300, parentId: null },
+      { id: 'room_2', type: 'room', shape: 'polygon', name: 'Custom Room', x: 500, y: 50, points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }], parentId: null },
+      { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90, parentId: 'room_1' },
+      { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10, parentId: 'room_1' },
+      { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90, parentId: 'room_1' }
     ];
   });
 
@@ -107,7 +107,7 @@ export default function App() {
     if (type === 'door') { w = 90; h = 10; name = 'Door'; x = 0; y = 0; }
     if (type === 'window') { w = 120; h = 10; name = 'Window'; x = 0; y = 0; }
 
-    const newEl = { id: generateId(), type, shape: 'rect', name, x, y, w, h };
+    const newEl = { id: generateId(), type, shape: 'rect', name, x, y, w, h, parentId: null };
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
   };
@@ -116,7 +116,8 @@ export default function App() {
     const newEl = {
       id: generateId(), type: 'room', shape: 'polygon', name: 'L-Shape Room',
       x: apartment.width / 2 - 150, y: apartment.depth / 2 - 150,
-      points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }]
+      points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 }],
+      parentId: null
     };
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
@@ -127,7 +128,8 @@ export default function App() {
   };
 
   const deleteElement = (id) => {
-    setElements(elements.filter(el => el.id !== id));
+    // Also un-parent any children if a room is deleted so they don't get lost
+    setElements(elements.map(el => el.parentId === id ? { ...el, parentId: null } : el).filter(el => el.id !== id));
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -150,6 +152,22 @@ export default function App() {
     setElements(newEls);
   };
 
+  const bringToFront = (id) => {
+    setElements(prev => {
+      const item = prev.find(el => el.id === id);
+      if (!item) return prev;
+      return [...prev.filter(el => el.id !== id), item]; // Move to the end of the array (drawn last/on top)
+    });
+  };
+
+  const sendToBack = (id) => {
+    setElements(prev => {
+      const item = prev.find(el => el.id === id);
+      if (!item) return prev;
+      return [item, ...prev.filter(el => el.id !== id)]; // Move to the start of the array (drawn first/on bottom)
+    });
+  };
+
   // --- SVG Drag & Drop Engine ---
 
   // Convert browser screen coordinates to exact SVG coordinates
@@ -170,7 +188,9 @@ export default function App() {
     if (el) {
       e.target.setPointerCapture(e.pointerId);
       if (dragType === 'element') {
-        setDragInfo({ dragType, id, startX: el.x, startY: el.y, startMouseX: coords.x, startMouseY: coords.y });
+        // Find all children belonging to this element to drag them together
+        const children = elements.filter(c => c.parentId === id).map(c => ({ id: c.id, startX: c.x, startY: c.y }));
+        setDragInfo({ dragType, id, startX: el.x, startY: el.y, startMouseX: coords.x, startMouseY: coords.y, children });
       } else if (dragType === 'vertex') {
         setDragInfo({ dragType, id, vIndex, startPx: el.points[vIndex].x, startPy: el.points[vIndex].y, startMouseX: coords.x, startMouseY: coords.y });
       }
@@ -184,6 +204,7 @@ export default function App() {
     const dy = coords.y - dragInfo.startMouseY;
 
     setElements(elements.map(el => {
+      // 1. Update the main element being dragged
       if (el.id === dragInfo.id) {
         if (dragInfo.dragType === 'element') {
           return { ...el, x: dragInfo.startX + dx, y: dragInfo.startY + dy };
@@ -193,6 +214,15 @@ export default function App() {
           return { ...el, points: newPoints };
         }
       }
+
+      // 2. Update any children attached to the dragged element
+      if (dragInfo.dragType === 'element' && dragInfo.children) {
+        const childInfo = dragInfo.children.find(c => c.id === el.id);
+        if (childInfo) {
+          return { ...el, x: childInfo.startX + dx, y: childInfo.startY + dy };
+        }
+      }
+
       return el;
     }));
   };
@@ -301,6 +331,22 @@ export default function App() {
                   <input type="text" value={selectedEl.name} onChange={(e) => updateSelected('name', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none text-sm" />
                 </div>
 
+                {selectedEl.type !== 'room' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Attach to Room</label>
+                    <select
+                      value={selectedEl.parentId || ''}
+                      onChange={(e) => updateSelected('parentId', e.target.value || null)}
+                      className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none text-sm bg-white"
+                    >
+                      <option value="">None (Apartment Layout)</option>
+                      {elements.filter(el => el.type === 'room').map(room => (
+                        <option key={room.id} value={room.id}>{room.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {selectedEl.shape === 'rect' ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -318,14 +364,20 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="flex gap-2 mt-1">
+                <div className="grid grid-cols-2 gap-2 mt-1">
                   {selectedEl.shape === 'rect' && (
-                    <button onClick={rotateSelected} className="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded text-xs transition-colors border border-slate-200">
+                    <button onClick={rotateSelected} className="col-span-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded text-xs transition-colors border border-slate-200">
                       Rotate 90°
                     </button>
                   )}
-                  <button onClick={() => deleteElement(selectedEl.id)} className="flex-1 flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded text-xs transition-colors border border-red-200">
+                  <button onClick={() => deleteElement(selectedEl.id)} className={`${selectedEl.shape === 'rect' ? 'col-span-1' : 'col-span-2'} flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded text-xs transition-colors border border-red-200`}>
                     Delete Item
+                  </button>
+                  <button onClick={() => bringToFront(selectedEl.id)} className="col-span-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded text-xs transition-colors border border-slate-200">
+                    Bring to Front
+                  </button>
+                  <button onClick={() => sendToBack(selectedEl.id)} className="col-span-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded text-xs transition-colors border border-slate-200">
+                    Send to Back
                   </button>
                 </div>
               </div>
@@ -341,18 +393,22 @@ export default function App() {
               {[...elements].reverse().map((el, revIdx) => {
                 const index = elements.length - 1 - revIdx;
                 const isSelected = selectedId === el.id;
+                const parent = el.parentId ? elements.find(p => p.id === el.parentId) : null;
                 return (
                   <div
                     key={el.id}
                     onClick={() => setSelectedId(el.id)}
-                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer border ${isSelected ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    className={`flex items-center justify-between p-2 rounded text-sm cursor-pointer border ${el.parentId ? 'ml-4 border-l-4 border-l-blue-400' : ''} ${isSelected ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                   >
                     <div className="flex items-center gap-2 truncate">
                       {/* Simple type indicators */}
                       <span className={`w-3 h-3 rounded-full shrink-0 ${el.type === 'room' ? 'bg-slate-800' : el.type === 'door' ? 'bg-amber-500' : el.type === 'window' ? 'bg-sky-300' : 'bg-blue-500'}`}></span>
-                      <span className="truncate font-medium text-xs">{el.name}</span>
+                      <div className="flex flex-col">
+                        <span className="truncate font-medium text-xs">{el.name}</span>
+                        {parent && <span className="text-[10px] text-slate-400 leading-tight">Grouped in: {parent.name}</span>}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 shrink-0">
                       <button onClick={(e) => { e.stopPropagation(); moveElementLayer(index, 'up'); }} className="p-1 text-slate-400 hover:text-slate-800 bg-slate-100 rounded" title="Move Layer Up">↑</button>
                       <button onClick={(e) => { e.stopPropagation(); moveElementLayer(index, 'down'); }} className="p-1 text-slate-400 hover:text-slate-800 bg-slate-100 rounded" title="Move Layer Down">↓</button>
                       <button onClick={(e) => { e.stopPropagation(); deleteElement(el.id); }} className="p-1 text-red-400 hover:text-red-600 bg-red-50 rounded" title="Delete">×</button>

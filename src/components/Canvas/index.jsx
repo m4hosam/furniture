@@ -10,8 +10,13 @@ const ZOOM_STEP = 0.1;
 
 /**
  * The main SVG canvas.
- * Wires the drag engine, renders grid + all elements + optional dimension rulers.
- * Supports Ctrl+Scroll zoom (CSS transform on the SVG wrapper).
+ * - Ctrl+Scroll / Ctrl+± / zoom buttons → zoom
+ * - Middle-mouse drag OR Space+drag       → pan
+ * - Zoom + Pan are combined as:
+ *     transform: translate(pan.x, pan.y) scale(zoom)  (on the SVG element)
+ *   Because translate is applied after scaling, it is always in screen-pixels
+ *   regardless of zoom level — 1px mouse move = 1px canvas pan.
+ *   getScreenCTM().inverse() in useDrag already accounts for this full transform.
  */
 export function Canvas({ apartment, elements, setElements, selectedId, setSelectedId }) {
   const svgRef = useRef(null);
@@ -20,6 +25,27 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
   const [showRulers, setShowRulers] = useState(true);
   const [zoom, setZoom] = useState(1);
 
+  // ── Pan state ─────────────────────────────────────────────────────────────
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Mirror of pan for use inside imperative event handlers (avoids stale closure)
+  const panRef = useRef({ x: 0, y: 0 });
+  // Active pan gesture info: { startMouseX, startMouseY, startPanX, startPanY }
+  const panGestureRef = useRef(null);
+  const [isPanning, setIsPanning] = useState(false);
+  // Space bar held for Space+drag pan
+  const spaceHeldRef = useRef(false);
+
+  const applyPan = (newPan) => {
+    panRef.current = newPan;
+    setPan(newPan);
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    applyPan({ x: 0, y: 0 });
+  };
+
+  // ── Element interaction wiring ────────────────────────────────────────────
   const onElementPointerDown = (e, dragType, id) =>
     handlePointerDown(e, dragType, id, setSelectedId);
 
@@ -29,32 +55,104 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
   const onRotateHandlePointerDown = (e, dragType, id) =>
     handlePointerDown(e, dragType, id, setSelectedId);
 
-  // ── Ctrl+Scroll zoom ──────────────────────────────────────────────────────
-  const handleWheel = useCallback((e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    e.stopPropagation();
+  // ── Start pan (middle-mouse or space+left) ────────────────────────────────
+  const startPan = useCallback((clientX, clientY) => {
+    panGestureRef.current = {
+      startMouseX: clientX,
+      startMouseY: clientY,
+      startPanX: panRef.current.x,
+      startPanY: panRef.current.y,
+    };
+    setIsPanning(true);
+  }, []);
 
-    setZoom((prev) => {
-      const delta = -e.deltaY * ZOOM_STEP * 0.05;
-      return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta));
+  const updatePan = useCallback((clientX, clientY) => {
+    if (!panGestureRef.current) return;
+    const { startMouseX, startMouseY, startPanX, startPanY } = panGestureRef.current;
+    applyPan({
+      x: startPanX + (clientX - startMouseX),
+      y: startPanY + (clientY - startMouseY),
     });
   }, []);
 
+  const endPan = useCallback(() => {
+    if (panGestureRef.current) {
+      panGestureRef.current = null;
+      setIsPanning(false);
+    }
+  }, []);
+
+  // ── Attach imperative listeners on the container ──────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    // passive:false so we can call preventDefault() inside the handler
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
 
-  // ── Zoom keyboard shortcuts ────────────────────────────────────────────────
+    // Prevent browser's own middle-click scroll / autoscroll
+    const onMouseDown = (e) => {
+      if (e.button === 1) {         // middle mouse
+        e.preventDefault();
+        startPan(e.clientX, e.clientY);
+      } else if (e.button === 0 && spaceHeldRef.current) {  // space+left
+        e.preventDefault();
+        startPan(e.clientX, e.clientY);
+      }
+    };
+
+    const onMouseMove = (e) => {
+      if (panGestureRef.current) {
+        e.preventDefault();
+        updatePan(e.clientX, e.clientY);
+      }
+    };
+
+    const onMouseUp = (e) => {
+      if (e.button === 1 || e.button === 0) endPan();
+    };
+
+    const onAuxClick = (e) => {
+      // Prevent default middle-click "open link in tab" behaviour
+      if (e.button === 1) e.preventDefault();
+    };
+
+    // Ctrl+Scroll zoom (passive:false to allow preventDefault)
+    const onWheel = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((prev) => {
+        const delta = -e.deltaY * ZOOM_STEP * 0.05;
+        return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta));
+      });
+    };
+
+    el.addEventListener('mousedown', onMouseDown);
+    el.addEventListener('mousemove', onMouseMove);
+    el.addEventListener('mouseup', onMouseUp);
+    el.addEventListener('mouseleave', endPan);
+    el.addEventListener('auxclick', onAuxClick);
+    el.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown);
+      el.removeEventListener('mousemove', onMouseMove);
+      el.removeEventListener('mouseup', onMouseUp);
+      el.removeEventListener('mouseleave', endPan);
+      el.removeEventListener('auxclick', onAuxClick);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [startPan, updatePan, endPan]);
+
+  // ── Space bar: hold to pan with left drag ─────────────────────────────────
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const onKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
+      if (e.key === ' ' && !e.repeat) {
+        e.preventDefault();
+        spaceHeldRef.current = true;
+      }
+
+      // Zoom keyboard shortcuts
       if (e.ctrlKey || e.metaKey) {
         if (e.key === '=' || e.key === '+') {
           e.preventDefault();
@@ -64,21 +162,37 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
           setZoom((prev) => Math.max(MIN_ZOOM, +(prev - ZOOM_STEP).toFixed(2)));
         } else if (e.key === '0') {
           e.preventDefault();
-          setZoom(1);
+          resetView();
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    const onKeyUp = (e) => {
+      if (e.key === ' ') {
+        spaceHeldRef.current = false;
+        endPan();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [endPan]);
+
+  // ── Cursor style on the container ─────────────────────────────────────────
+  const containerCursor = isPanning ? 'cursor-grabbing' : 'cursor-crosshair';
 
   const zoomPct = Math.round(zoom * 100);
 
   return (
     <div
       ref={containerRef}
-      className="flex-1 relative bg-gradient-to-br from-slate-400 to-slate-500 p-2 sm:p-6 overflow-hidden flex items-center justify-center cursor-crosshair touch-none"
-      onPointerDown={() => setSelectedId(null)}
+      className={`flex-1 relative bg-gradient-to-br from-slate-400 to-slate-500 p-2 sm:p-6 overflow-hidden flex items-center justify-center touch-none ${containerCursor}`}
+      onPointerDown={(e) => {
+        // Only deselect on left-click that isn't a pan gesture
+        if (e.button === 0 && !isPanning && !spaceHeldRef.current) setSelectedId(null);
+      }}
     >
       {/* ── Ruler Toggle Button ─────────────────────────────────────────── */}
       <button
@@ -139,6 +253,26 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
         )}
       </div>
 
+      {/* ── Pan hint badge (shown when panning) ─────────────────────────── */}
+      <div
+        id="pan-badge"
+        className={`
+          absolute top-4 left-1/2 -translate-x-1/2 z-20
+          flex items-center gap-2 px-4 py-2 rounded-xl
+          text-sm font-bold shadow-xl border
+          pointer-events-none select-none
+          transition-all duration-100
+          ${isPanning && !axisLock
+            ? 'opacity-100 scale-100 bg-slate-700 border-slate-800 text-white shadow-slate-700/40'
+            : 'opacity-0 scale-90 bg-white border-slate-200 text-slate-700'}
+        `}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M12 12h.01" />
+        </svg>
+        Panning
+      </div>
+
       {/* ── Rotation Badge ───────────────────────────────────────────────── */}
       <div
         id="rotation-badge"
@@ -173,8 +307,8 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
 
         <button
           id="btn-zoom-reset"
-          title="Reset zoom (Ctrl 0)"
-          onClick={() => setZoom(1)}
+          title="Reset zoom & pan (Ctrl 0)"
+          onClick={resetView}
           className="min-w-[3.5rem] h-7 flex items-center justify-center rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors tabular-nums"
         >
           {zoomPct}%
@@ -188,7 +322,7 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
         >+</button>
       </div>
 
-      {/* ── SVG (zoom applied via CSS transform) ────────────────────────── */}
+      {/* ── SVG (pan + zoom applied via CSS transform) ────────────────────── */}
       <svg
         ref={svgRef}
         viewBox={`0 0 ${apartment.width} ${apartment.depth}`}
@@ -198,9 +332,13 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
           height: '100%',
           objectFit: 'contain',
           display: 'block',
-          transform: `scale(${zoom})`,
+          // translate is in screen-pixels (applied after scale), so 1px drag = 1px pan always
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: 'center center',
-          transition: 'transform 0.05s ease-out',
+          // No transition during pan (feels instant); short ease during zoom
+          transition: isPanning ? 'none' : 'transform 0.05s ease-out',
+          // Grab cursor when space is pressed (before clicking)
+          cursor: isPanning ? 'grabbing' : spaceHeldRef.current ? 'grab' : undefined,
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

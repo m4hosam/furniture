@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApartment } from './hooks/useApartment';
 import { useElements } from './hooks/useElements';
 import { useFileIO } from './hooks/useFileIO';
@@ -22,6 +22,22 @@ export default function App() {
 
   const { fileInputRef, exportToJson, importFromJson, triggerFileInput, resetLayout } =
     useFileIO({ apartment, elements, setApartment, setElements, setSelectedId });
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Skip when user is typing in an input/textarea/select
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        e.preventDefault();
+        deleteElement(selectedId);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, deleteElement]);
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-100 overflow-hidden">

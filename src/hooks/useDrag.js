@@ -1,15 +1,20 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 
 /**
  * Encapsulates the SVG pointer drag engine.
  * Handles element moves (including child elements) and polygon vertex drags.
  *
- * @param {Array}    elements   - Current elements array (read-only, for lookups)
+ * Shift-drag on a vertex → constrain to horizontal (H) or vertical (V) axis,
+ * determined by the dominant direction of the drag so far.
+ *
+ * @param {Array}    elements    - Current elements array (read-only, for lookups)
  * @param {Function} setElements - State setter from useElements
- * @param {Object}   svgRef     - React ref pointing at the <svg> element
+ * @param {Object}   svgRef      - React ref pointing at the <svg> element
  */
 export function useDrag(elements, setElements, svgRef) {
   const [dragInfo, setDragInfo] = useState(null);
+  // null | 'h' | 'v'
+  const [axisLock, setAxisLock] = useState(null);
 
   /**
    * Converts browser screen coordinates to SVG user-space coordinates.
@@ -40,6 +45,7 @@ export function useDrag(elements, setElements, svgRef) {
           startMouseX: coords.x, startMouseY: coords.y,
           children,
         });
+        setAxisLock(null);
       } else if (dragType === 'vertex') {
         setDragInfo({
           dragType, id, vIndex,
@@ -47,6 +53,7 @@ export function useDrag(elements, setElements, svgRef) {
           startPy: el.points[vIndex].y,
           startMouseX: coords.x, startMouseY: coords.y,
         });
+        setAxisLock(null);
       }
     }
   };
@@ -54,8 +61,24 @@ export function useDrag(elements, setElements, svgRef) {
   const handlePointerMove = (e) => {
     if (!dragInfo) return;
     const coords = getMouseCoords(e);
-    const dx = coords.x - dragInfo.startMouseX;
-    const dy = coords.y - dragInfo.startMouseY;
+    let dx = coords.x - dragInfo.startMouseX;
+    let dy = coords.y - dragInfo.startMouseY;
+
+    // ── Shift-axis constraint (vertex drag only) ──────────────────────────
+    let currentAxisLock = null;
+    if (dragInfo.dragType === 'vertex' && e.shiftKey) {
+      // Determine dominant axis from total displacement
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        currentAxisLock = 'h';
+        dy = 0;
+      } else {
+        currentAxisLock = 'v';
+        dx = 0;
+      }
+      setAxisLock(currentAxisLock);
+    } else {
+      setAxisLock(null);
+    }
 
     setElements((prev) =>
       prev.map((el) => {
@@ -86,8 +109,16 @@ export function useDrag(elements, setElements, svgRef) {
     if (dragInfo) {
       e.target.releasePointerCapture(e.pointerId);
       setDragInfo(null);
+      setAxisLock(null);
     }
   };
 
-  return { handlePointerDown, handlePointerMove, handlePointerUp };
+  return {
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    /** 'h' = horizontal lock, 'v' = vertical lock, null = free */
+    axisLock,
+    dragInfo,
+  };
 }

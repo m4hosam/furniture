@@ -65,6 +65,21 @@ export function useElements() {
     setSelectedId(newEl.id);
   };
 
+  const addRuler = (apartmentWidth, apartmentDepth) => {
+    const cx = apartmentWidth / 2;
+    const cy = apartmentDepth / 2;
+    const newEl = {
+      id: generateId(), type: 'ruler', shape: 'line', name: 'Ruler',
+      x: cx - 100, y: cy,
+      points: [
+        { x: 0, y: 0 }, { x: 200, y: 0 },
+      ],
+      rotation: 0, parentId: null,
+    };
+    setElements((prev) => [...prev, newEl]);
+    setSelectedId(newEl.id);
+  };
+
   // ── UPDATE ───────────────────────────────────────────────────────────────────
 
   const updateSelected = (key, value) => {
@@ -205,7 +220,7 @@ export function useElements() {
     elements, setElements,
     selectedId, setSelectedId, selectedEl,
     rooms,
-    addRectElement, addCustomRoom,
+    addRectElement, addCustomRoom, addRuler,
     updateSelected, rotateSelected, setSelectedRotation,
     cloneSelected, copySelected, pasteClipboard,
     deleteElement,

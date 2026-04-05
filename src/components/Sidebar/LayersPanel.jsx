@@ -5,6 +5,7 @@ const TYPE_DOT = {
   furniture: 'bg-blue-500',
   door:      'bg-amber-500',
   window:    'bg-sky-400',
+  ruler:     'bg-red-500',
 };
 
 const TYPE_LABEL = {
@@ -12,6 +13,7 @@ const TYPE_LABEL = {
   furniture: { text: 'Furniture', cls: 'bg-blue-50  text-blue-600  border-blue-100'  },
   door:      { text: 'Door',      cls: 'bg-amber-50 text-amber-600 border-amber-100' },
   window:    { text: 'Window',    cls: 'bg-sky-50   text-sky-600   border-sky-100'   },
+  ruler:     { text: 'Ruler',     cls: 'bg-red-50   text-red-500   border-red-100'   },
 };
 
 /**

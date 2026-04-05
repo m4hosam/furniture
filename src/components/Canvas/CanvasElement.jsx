@@ -180,6 +180,90 @@ export function CanvasElement({
         </>
       )}
 
+      {/* ── Line element (Ruler) ─────────────────────────────────────────── */}
+      {el.shape === 'line' && (
+        <>
+          <line
+            x1={el.points[0].x} y1={el.points[0].y}
+            x2={el.points[1].x} y2={el.points[1].y}
+            stroke={activeStroke}
+            strokeWidth={activeStrokeWidth}
+            strokeDasharray="6 4"
+            {...interactionProps}
+          />
+          <line
+            x1={el.points[0].x} y1={el.points[0].y}
+            x2={el.points[1].x} y2={el.points[1].y}
+            stroke="transparent"
+            strokeWidth={15}
+            {...interactionProps}
+          />
+          <rect
+            x={getPolygonCenter(el.points).cx - 30}
+            y={getPolygonCenter(el.points).cy - 10}
+            width={60} height={20}
+            fill="#ffffff"
+            rx={4}
+            className="pointer-events-none"
+            opacity={0.8}
+          />
+          <text
+            x={getPolygonCenter(el.points).cx}
+            y={getPolygonCenter(el.points).cy}
+            dominantBaseline="middle" textAnchor="middle"
+            fill={activeStroke} fontSize="12" fontWeight="700"
+            fontFamily="Inter, sans-serif"
+            className="pointer-events-none select-none"
+          >
+            {Math.hypot(el.points[1].x - el.points[0].x, el.points[1].y - el.points[0].y).toFixed(1)} cm
+          </text>
+
+          {/* Draggable vertex handles (visible only when selected) */}
+          {isSelected && el.points.map((p, i) => {
+            const isActive = i === activeVertexIndex;
+            const vColor = isActive && axisLock ? lockColor : '#2563eb';
+            const vR = isActive && axisLock ? 13 : 11;
+
+            return (
+              <g key={i}>
+                {isActive && axisLock && (
+                  <circle
+                    cx={p.x} cy={p.y} r={vR + 5}
+                    fill="none"
+                    stroke={vColor}
+                    strokeWidth={2}
+                    strokeOpacity={0.35}
+                    className="pointer-events-none"
+                  />
+                )}
+                <circle
+                  cx={p.x} cy={p.y} r={vR}
+                  fill={isActive && axisLock ? vColor : '#ffffff'}
+                  stroke={vColor}
+                  strokeWidth={isActive && axisLock ? 0 : 3}
+                  className="cursor-crosshair"
+                  style={{ touchAction: 'none' }}
+                  onPointerDown={(e) => onVertexPointerDown(e, 'vertex', el.id, i)}
+                />
+                {isActive && axisLock && (
+                  <text
+                    x={p.x} y={p.y}
+                    dominantBaseline="middle" textAnchor="middle"
+                    fill="#ffffff"
+                    fontSize={10}
+                    fontWeight="700"
+                    fontFamily="Inter, sans-serif"
+                    className="pointer-events-none select-none"
+                  >
+                    {axisLock === 'h' ? 'H' : 'V'}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </>
+      )}
+
       {/* ── Rotation handle (shown when selected) ────────────────────────── */}
       {isSelected && (
         <g className="pointer-events-none">

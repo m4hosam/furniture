@@ -145,7 +145,7 @@ export function useDrag(elements, setElements, svgRef) {
         if (el.id === dragInfo.id) {
           if (dragInfo.dragType === 'element') {
             return { ...el, x: dragInfo.startX + dx, y: dragInfo.startY + dy };
-          } else if (dragInfo.dragType === 'vertex' && el.shape === 'polygon') {
+          } else if (dragInfo.dragType === 'vertex' && (el.shape === 'polygon' || el.shape === 'line')) {
             const newPoints = [...el.points];
             newPoints[dragInfo.vIndex] = {
               x: dragInfo.startPx + dx,

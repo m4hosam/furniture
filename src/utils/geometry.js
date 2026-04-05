@@ -30,6 +30,8 @@ export const getElementStyle = (type) => {
       return { fill: '#d97706', stroke: '#78350f', strokeWidth: 2 };
     case 'window':
       return { fill: 'rgba(186, 230, 253, 0.8)', stroke: '#0284c7', strokeWidth: 2 };
+    case 'ruler':
+      return { fill: 'none', stroke: '#ef4444', strokeWidth: 2 };
     default:
       return { fill: '#ffffff', stroke: '#334155', strokeWidth: 2 };
   }

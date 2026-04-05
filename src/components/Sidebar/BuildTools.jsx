@@ -9,7 +9,7 @@ const iconAdd = (
 /**
  * "Build Elements" toolbar — add rooms, furniture, doors, and windows.
  */
-export function BuildTools({ onAddRect, onAddCustomRoom }) {
+export function BuildTools({ onAddRect, onAddCustomRoom, onAddRuler }) {
   return (
     <div className="border-t border-slate-100 pt-5 flex flex-col gap-2">
       <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Build Elements</h2>
@@ -58,6 +58,17 @@ export function BuildTools({ onAddRect, onAddCustomRoom }) {
           {iconAdd} Window
         </button>
       </div>
+
+      <button
+        id="btn-add-ruler"
+        onClick={onAddRuler}
+        className="w-full flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-3 rounded-lg text-xs border border-red-200 font-medium transition-all"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v18M18 3v18M6 8h12M6 16h12" />
+        </svg>
+        Measure Distance (Ruler)
+      </button>
     </div>
   );
 }

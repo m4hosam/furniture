@@ -16,7 +16,7 @@ export function Sidebar({
   // Elements
   elements, selectedId, selectedEl, rooms,
   onSelect,
-  onAddRect, onAddCustomRoom,
+  onAddRect, onAddCustomRoom, onAddRuler,
   onUpdate, onRotate, onSetRotation, onClone, onDelete,
   onBringToFront, onSendToBack,
   onMoveLayer,
@@ -57,6 +57,7 @@ export function Sidebar({
         <BuildTools
           onAddRect={onAddRect}
           onAddCustomRoom={onAddCustomRoom}
+          onAddRuler={onAddRuler}
         />
 
         <PropertiesPanel

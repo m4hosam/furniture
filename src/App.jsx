@@ -15,7 +15,7 @@ export default function App() {
   const {
     elements, setElements,
     selectedId, setSelectedId, selectedEl, rooms,
-    addRectElement, addCustomRoom,
+    addRectElement, addCustomRoom, addRuler,
     updateSelected, rotateSelected, setSelectedRotation,
     cloneSelected, copySelected, pasteClipboard,
     deleteElement, moveElementLayer, bringToFront, sendToBack,
@@ -77,6 +77,7 @@ export default function App() {
         onSelect={setSelectedId}
         onAddRect={(type) => addRectElement(type, apartment.width, apartment.depth)}
         onAddCustomRoom={() => addCustomRoom(apartment.width, apartment.depth)}
+        onAddRuler={() => addRuler(apartment.width, apartment.depth)}
         onUpdate={updateSelected}
         onRotate={rotateSelected}
         onSetRotation={setSelectedRotation}

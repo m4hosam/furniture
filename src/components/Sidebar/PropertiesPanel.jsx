@@ -16,6 +16,7 @@ export function PropertiesPanel({
   onUpdate,
   onRotate,
   onSetRotation,
+  onClone,
   onDelete,
   onBringToFront,
   onSendToBack,
@@ -221,7 +222,10 @@ export function PropertiesPanel({
 
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-2 mt-1">
-            <button id="btn-delete" onClick={() => onDelete(selectedEl.id)} className={`col-span-2 ${btnDanger}`}>
+            <button id="btn-clone" onClick={onClone} className={btnSecondary} title="Duplicate Item (Ctrl+D)">
+              ⎘ Duplicate Item
+            </button>
+            <button id="btn-delete" onClick={() => onDelete(selectedEl.id)} className={btnDanger} title="Delete Item (Del)">
               ✕ Delete Item
             </button>
             <button id="btn-bring-front" onClick={() => onBringToFront(selectedEl.id)} className={btnSecondary}>

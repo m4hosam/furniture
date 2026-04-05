@@ -108,6 +108,68 @@ export function useElements() {
     if (selectedId === id) setSelectedId(null);
   };
 
+  // ── CLONE & COPY/PASTE ────────────────────────────────────────────────────────
+
+  const performClone = (sourceEl, sourceChildren) => {
+    const newId = generateId();
+    const clonedEls = [];
+    
+    // Clone parent
+    const clone = { ...sourceEl, id: newId };
+    clone.x += 20;
+    clone.y += 20;
+    if (clone.name && !clone.name.endsWith(' (copy)')) {
+      clone.name += ' (copy)';
+    }
+    clonedEls.push(clone);
+
+    // Clone children (if any)
+    for (const child of sourceChildren) {
+      const childClone = { ...child, id: generateId(), parentId: newId };
+      childClone.x += 20;
+      childClone.y += 20;
+      clonedEls.push(childClone);
+    }
+
+    setElements((prev) => [...prev, ...clonedEls]);
+    setSelectedId(newId);
+    
+    return { element: clone, children: clonedEls.slice(1) };
+  };
+
+  const cloneSelected = () => {
+    if (!selectedId) return;
+    const selected = elements.find((el) => el.id === selectedId);
+    if (!selected) return;
+    const children = elements.filter((el) => el.parentId === selected.id);
+    performClone(selected, children);
+  };
+
+  const copySelected = () => {
+    if (!selectedId) return;
+    const selected = elements.find((el) => el.id === selectedId);
+    if (!selected) return;
+    const children = elements.filter((el) => el.parentId === selected.id);
+    
+    const clipData = { element: selected, children };
+    localStorage.setItem('apartmentClipboard', JSON.stringify(clipData));
+  };
+
+  const pasteClipboard = () => {
+    const clipRaw = localStorage.getItem('apartmentClipboard');
+    if (!clipRaw) return;
+    try {
+      const clipData = JSON.parse(clipRaw);
+      if (!clipData || !clipData.element) return;
+      
+      const nextClipData = performClone(clipData.element, clipData.children || []);
+      // Update clipboard with shifted versions so next paste offsets further
+      localStorage.setItem('apartmentClipboard', JSON.stringify(nextClipData));
+    } catch (e) {
+      console.error('Failed to paste from clipboard', e);
+    }
+  };
+
   // ── LAYER ORDER ──────────────────────────────────────────────────────────────
 
   const moveElementLayer = (index, direction) => {
@@ -145,6 +207,7 @@ export function useElements() {
     rooms,
     addRectElement, addCustomRoom,
     updateSelected, rotateSelected, setSelectedRotation,
+    cloneSelected, copySelected, pasteClipboard,
     deleteElement,
     moveElementLayer, bringToFront, sendToBack,
   };

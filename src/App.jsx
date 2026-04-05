@@ -17,6 +17,7 @@ export default function App() {
     selectedId, setSelectedId, selectedEl, rooms,
     addRectElement, addCustomRoom,
     updateSelected, rotateSelected, setSelectedRotation,
+    cloneSelected, copySelected, pasteClipboard,
     deleteElement, moveElementLayer, bringToFront, sendToBack,
   } = useElements();
 
@@ -34,10 +35,27 @@ export default function App() {
         e.preventDefault();
         deleteElement(selectedId);
       }
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'c' || e.key === 'C') {
+          if (selectedId) {
+            e.preventDefault();
+            copySelected();
+          }
+        } else if (e.key === 'v' || e.key === 'V') {
+          e.preventDefault();
+          pasteClipboard();
+        } else if (e.key === 'd' || e.key === 'D') {
+          if (selectedId) {
+            e.preventDefault();
+            cloneSelected();
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, deleteElement]);
+  }, [selectedId, deleteElement, copySelected, pasteClipboard, cloneSelected]);
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-100 overflow-hidden">
@@ -62,6 +80,7 @@ export default function App() {
         onUpdate={updateSelected}
         onRotate={rotateSelected}
         onSetRotation={setSelectedRotation}
+        onClone={cloneSelected}
         onDelete={deleteElement}
         onBringToFront={bringToFront}
         onSendToBack={sendToBack}

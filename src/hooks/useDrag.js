@@ -2,10 +2,11 @@ import { useState } from 'react';
 
 /**
  * Encapsulates the SVG pointer drag engine.
- * Handles element moves (including child elements) and polygon vertex drags.
+ * Handles element moves (including child elements), polygon vertex drags,
+ * and free-rotation via a rotation handle above each selected element.
  *
- * Shift-drag on a vertex → constrain to horizontal (H) or vertical (V) axis,
- * determined by the dominant direction of the drag so far.
+ * Shift during vertex drag  → axis constrain (H / V)
+ * Shift during rotate drag  → snap to 15° increments
  *
  * @param {Array}    elements    - Current elements array (read-only, for lookups)
  * @param {Function} setElements - State setter from useElements
@@ -15,16 +16,35 @@ export function useDrag(elements, setElements, svgRef) {
   const [dragInfo, setDragInfo] = useState(null);
   // null | 'h' | 'v'
   const [axisLock, setAxisLock] = useState(null);
+  // current live rotation angle while dragging (degrees)
+  const [liveRotation, setLiveRotation] = useState(null);
 
-  /**
-   * Converts browser screen coordinates to SVG user-space coordinates.
-   */
+  /** Converts browser screen coordinates to SVG user-space coordinates. */
   const getMouseCoords = (e) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const pt = svgRef.current.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
     return pt.matrixTransform(svgRef.current.getScreenCTM().inverse());
+  };
+
+  /** Returns the centre point of an element in its LOCAL (pre-translate) space. */
+  const getElementCenter = (el) => {
+    if (el.shape === 'rect') {
+      return { cx: el.x + el.w / 2, cy: el.y + el.h / 2 };
+    }
+    // polygon — use bounding-box centroid
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of el.points) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return {
+      cx: el.x + (minX + maxX) / 2,
+      cy: el.y + (minY + maxY) / 2,
+    };
   };
 
   const handlePointerDown = (e, dragType, id, setSelectedId, vIndex = null) => {
@@ -35,6 +55,7 @@ export function useDrag(elements, setElements, svgRef) {
 
     if (el) {
       e.target.setPointerCapture(e.pointerId);
+
       if (dragType === 'element') {
         const children = elements
           .filter((c) => c.parentId === id)
@@ -46,6 +67,8 @@ export function useDrag(elements, setElements, svgRef) {
           children,
         });
         setAxisLock(null);
+        setLiveRotation(null);
+
       } else if (dragType === 'vertex') {
         setDragInfo({
           dragType, id, vIndex,
@@ -54,6 +77,20 @@ export function useDrag(elements, setElements, svgRef) {
           startMouseX: coords.x, startMouseY: coords.y,
         });
         setAxisLock(null);
+        setLiveRotation(null);
+
+      } else if (dragType === 'rotate') {
+        const { cx, cy } = getElementCenter(el);
+        const startAngle = Math.atan2(coords.y - cy, coords.x - cx) * (180 / Math.PI);
+        const startRotation = el.rotation ?? 0;
+        setDragInfo({
+          dragType, id,
+          cx, cy,
+          startAngle,
+          startRotation,
+        });
+        setAxisLock(null);
+        setLiveRotation(startRotation);
       }
     }
   };
@@ -67,7 +104,6 @@ export function useDrag(elements, setElements, svgRef) {
     // ── Shift-axis constraint (vertex drag only) ──────────────────────────
     let currentAxisLock = null;
     if (dragInfo.dragType === 'vertex' && e.shiftKey) {
-      // Determine dominant axis from total displacement
       if (Math.abs(dx) >= Math.abs(dy)) {
         currentAxisLock = 'h';
         dy = 0;
@@ -76,8 +112,32 @@ export function useDrag(elements, setElements, svgRef) {
         dx = 0;
       }
       setAxisLock(currentAxisLock);
-    } else {
+    } else if (dragInfo.dragType !== 'rotate') {
       setAxisLock(null);
+    }
+
+    // ── Rotate drag ───────────────────────────────────────────────────────
+    if (dragInfo.dragType === 'rotate') {
+      const { cx, cy, startAngle, startRotation } = dragInfo;
+      const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) * (180 / Math.PI);
+      let delta = currentAngle - startAngle;
+      let newRotation = startRotation + delta;
+
+      // Shift → snap to 15° increments
+      if (e.shiftKey) {
+        newRotation = Math.round(newRotation / 15) * 15;
+      }
+
+      // Normalise to [0, 360)
+      newRotation = ((newRotation % 360) + 360) % 360;
+      setLiveRotation(newRotation);
+
+      setElements((prev) =>
+        prev.map((el) =>
+          el.id === dragInfo.id ? { ...el, rotation: +newRotation.toFixed(1) } : el
+        )
+      );
+      return;
     }
 
     setElements((prev) =>
@@ -110,6 +170,7 @@ export function useDrag(elements, setElements, svgRef) {
       e.target.releasePointerCapture(e.pointerId);
       setDragInfo(null);
       setAxisLock(null);
+      setLiveRotation(null);
     }
   };
 
@@ -120,5 +181,7 @@ export function useDrag(elements, setElements, svgRef) {
     /** 'h' = horizontal lock, 'v' = vertical lock, null = free */
     axisLock,
     dragInfo,
+    /** Live degrees while rotating, null otherwise */
+    liveRotation,
   };
 }

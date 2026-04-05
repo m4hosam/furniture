@@ -1,16 +1,47 @@
 import React from 'react';
 import { getElementStyle, getPolygonCenter } from '../../utils/geometry';
 
+/** Distance from the element's bounding-box edge to the rotation handle (SVG units) */
+const HANDLE_OFFSET = 32;
+const HANDLE_R = 10;
+
 /**
  * Renders a single canvas element — either a rect or a polygon.
- * Handles selection highlight, label text, and vertex drag handles for polygons.
+ * Applies a CSS/SVG rotation transform around the element's centre.
+ * Shows a rotation handle (arc icon + line) when the element is selected.
  *
  * Props:
  *   activeVertexIndex  — index of the vertex currently being dragged (null = none)
- *   axisLock           — 'h' | 'v' | null — constraint axis during Shift-drag
+ *   axisLock           — 'h' | 'v' | null — constraint axis during Shift vertex drag
+ *   isRotating         — true while a rotate drag is in progress for this element
  */
-export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDown, activeVertexIndex, axisLock }) {
+export function CanvasElement({
+  el,
+  isSelected,
+  onPointerDown,
+  onVertexPointerDown,
+  onRotateHandlePointerDown,
+  activeVertexIndex,
+  axisLock,
+  isRotating,
+}) {
   const { fill, stroke, strokeWidth } = getElementStyle(el.type);
+  const rotation = el.rotation ?? 0;
+
+  // Centre of this element (LOCAL coords for the rotation pivot)
+  let cx, cy;
+  if (el.shape === 'rect') {
+    cx = el.w / 2;
+    cy = el.h / 2;
+  } else {
+    const c = getPolygonCenter(el.points);
+    cx = c.cx;
+    cy = c.cy;
+  }
+
+  // The rotation handle sits directly above/top-centre at HANDLE_OFFSET above the bbox top
+  const handleX = cx;
+  const handleY = el.shape === 'rect' ? -HANDLE_OFFSET : (Math.min(...el.points.map((p) => p.y)) - HANDLE_OFFSET);
 
   const interactionProps = {
     onPointerDown: (e) => onPointerDown(e, 'element', el.id),
@@ -27,9 +58,11 @@ export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDo
 
   // Axis-lock colours for the active vertex handle
   const lockColor = axisLock === 'h' ? '#f59e0b' : axisLock === 'v' ? '#7c3aed' : '#2563eb';
+  // Rotation handle colour
+  const rotHandleColor = isRotating ? '#f97316' : '#10b981';
 
   return (
-    <g transform={`translate(${el.x}, ${el.y})`}>
+    <g transform={`translate(${el.x}, ${el.y}) rotate(${rotation}, ${cx}, ${cy})`}>
 
       {/* ── Rectangular element ─────────────────────────────────────────── */}
       {el.shape === 'rect' && (
@@ -109,7 +142,6 @@ export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDo
 
             return (
               <g key={i}>
-                {/* Outer glow ring when axis-locked */}
                 {isActive && axisLock && (
                   <circle
                     cx={p.x} cy={p.y} r={vR + 5}
@@ -120,8 +152,6 @@ export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDo
                     className="pointer-events-none"
                   />
                 )}
-
-                {/* Main handle circle */}
                 <circle
                   cx={p.x} cy={p.y} r={vR}
                   fill={isActive && axisLock ? vColor : '#ffffff'}
@@ -131,8 +161,6 @@ export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDo
                   style={{ touchAction: 'none' }}
                   onPointerDown={(e) => onVertexPointerDown(e, 'vertex', el.id, i)}
                 />
-
-                {/* H / V label inside the active locked vertex */}
                 {isActive && axisLock && (
                   <text
                     x={p.x} y={p.y}
@@ -150,6 +178,58 @@ export function CanvasElement({ el, isSelected, onPointerDown, onVertexPointerDo
             );
           })}
         </>
+      )}
+
+      {/* ── Rotation handle (shown when selected) ────────────────────────── */}
+      {isSelected && (
+        <g className="pointer-events-none">
+          {/* Stem line from bbox-top-centre to the handle */}
+          <line
+            x1={cx} y1={el.shape === 'rect' ? 0 : Math.min(...el.points.map((p) => p.y))}
+            x2={handleX} y2={handleY}
+            stroke={rotHandleColor}
+            strokeWidth={2}
+            strokeDasharray="4 3"
+            opacity={0.8}
+          />
+        </g>
+      )}
+      {isSelected && (
+        <g
+          style={{ touchAction: 'none', cursor: 'grab' }}
+          onPointerDown={(e) => onRotateHandlePointerDown(e, 'rotate', el.id)}
+        >
+          {/* Outer glow when rotating */}
+          {isRotating && (
+            <circle
+              cx={handleX} cy={handleY} r={HANDLE_R + 6}
+              fill="none"
+              stroke={rotHandleColor}
+              strokeWidth={2}
+              strokeOpacity={0.3}
+            />
+          )}
+          {/* Handle background */}
+          <circle
+            cx={handleX} cy={handleY} r={HANDLE_R}
+            fill={isRotating ? rotHandleColor : '#ffffff'}
+            stroke={rotHandleColor}
+            strokeWidth={2.5}
+          />
+          {/* Rotation arc icon */}
+          <path
+            d="M-5,-3 A6,6 0 1,1 5,-3"
+            transform={`translate(${handleX}, ${handleY})`}
+            fill="none"
+            stroke={isRotating ? '#ffffff' : rotHandleColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+          <polygon
+            points={`${handleX + 5},${handleY - 3} ${handleX + 5},${handleY + 2} ${handleX + 9},${handleY - 1}`}
+            fill={isRotating ? '#ffffff' : rotHandleColor}
+          />
+        </g>
       )}
     </g>
   );

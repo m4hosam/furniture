@@ -17,7 +17,7 @@ export function Sidebar({
   elements, selectedId, selectedEl, rooms,
   onSelect,
   onAddRect, onAddCustomRoom,
-  onUpdate, onRotate, onDelete,
+  onUpdate, onRotate, onSetRotation, onDelete,
   onBringToFront, onSendToBack,
   onMoveLayer,
 }) {
@@ -64,6 +64,7 @@ export function Sidebar({
           rooms={rooms}
           onUpdate={onUpdate}
           onRotate={onRotate}
+          onSetRotation={onSetRotation}
           onDelete={onDelete}
           onBringToFront={onBringToFront}
           onSendToBack={onSendToBack}

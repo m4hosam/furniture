@@ -16,7 +16,7 @@ export default function App() {
     elements, setElements,
     selectedId, setSelectedId, selectedEl, rooms,
     addRectElement, addCustomRoom,
-    updateSelected, rotateSelected,
+    updateSelected, rotateSelected, setSelectedRotation,
     deleteElement, moveElementLayer, bringToFront, sendToBack,
   } = useElements();
 
@@ -61,6 +61,7 @@ export default function App() {
         onAddCustomRoom={() => addCustomRoom(apartment.width, apartment.depth)}
         onUpdate={updateSelected}
         onRotate={rotateSelected}
+        onSetRotation={setSelectedRotation}
         onDelete={deleteElement}
         onBringToFront={bringToFront}
         onSendToBack={sendToBack}

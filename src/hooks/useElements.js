@@ -4,7 +4,7 @@ import { generateId } from '../utils/geometry';
 const STORAGE_KEY = 'apartmentElements';
 
 const DEFAULT_ELEMENTS = [
-  { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300, parentId: null },
+  { id: 'room_1', type: 'room', shape: 'rect', name: 'Living Room', x: 50, y: 50, w: 400, h: 300, rotation: 0, parentId: null },
   {
     id: 'room_2', type: 'room', shape: 'polygon', name: 'Custom Room',
     x: 500, y: 50,
@@ -12,11 +12,11 @@ const DEFAULT_ELEMENTS = [
       { x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 },
       { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 },
     ],
-    parentId: null,
+    rotation: 0, parentId: null,
   },
-  { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90, parentId: 'room_1' },
-  { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10, parentId: 'room_1' },
-  { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90, parentId: 'room_1' },
+  { id: 'door_1', type: 'door', shape: 'rect', name: 'Main Door', x: 50, y: 150, w: 10, h: 90, rotation: 0, parentId: 'room_1' },
+  { id: 'win_1', type: 'window', shape: 'rect', name: 'Window', x: 200, y: 50, w: 120, h: 10, rotation: 0, parentId: 'room_1' },
+  { id: 'furn_1', type: 'furniture', shape: 'rect', name: 'Sofa', x: 150, y: 150, w: 200, h: 90, rotation: 0, parentId: 'room_1' },
 ];
 
 /**
@@ -46,7 +46,7 @@ export function useElements() {
       window:    { w: 120, h: 10,  name: 'Window',    x: 0,        y: 0        },
     };
     const { w, h, name, x, y } = defaults[type] ?? { w: 100, h: 100, name: 'New Item', x: cx - 50, y: cy - 50 };
-    const newEl = { id: generateId(), type, shape: 'rect', name, x, y, w, h, parentId: null };
+    const newEl = { id: generateId(), type, shape: 'rect', name, x, y, w, h, rotation: 0, parentId: null };
     setElements((prev) => [...prev, newEl]);
     setSelectedId(newEl.id);
   };
@@ -59,7 +59,7 @@ export function useElements() {
         { x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 },
         { x: 150, y: 300 }, { x: 150, y: 150 }, { x: 0, y: 150 },
       ],
-      parentId: null,
+      rotation: 0, parentId: null,
     };
     setElements((prev) => [...prev, newEl]);
     setSelectedId(newEl.id);
@@ -73,12 +73,26 @@ export function useElements() {
     );
   };
 
-  const rotateSelected = () => {
+  /**
+   * Rotate selected element by `delta` degrees (default 90).
+   * Also works as the quick 90° button when called with no argument.
+   */
+  const rotateSelected = (delta = 90) => {
     setElements((prev) =>
       prev.map((el) =>
-        el.id === selectedId && el.shape === 'rect'
-          ? { ...el, w: el.h, h: el.w }
+        el.id === selectedId
+          ? { ...el, rotation: +(((( el.rotation ?? 0) + delta) % 360 + 360) % 360).toFixed(1) }
           : el
+      )
+    );
+  };
+
+  /** Set the rotation of the selected element to an exact degree value. */
+  const setSelectedRotation = (deg) => {
+    const normalised = +((((Number(deg)) % 360) + 360) % 360).toFixed(1);
+    setElements((prev) =>
+      prev.map((el) =>
+        el.id === selectedId ? { ...el, rotation: normalised } : el
       )
     );
   };
@@ -130,7 +144,7 @@ export function useElements() {
     selectedId, setSelectedId, selectedEl,
     rooms,
     addRectElement, addCustomRoom,
-    updateSelected, rotateSelected,
+    updateSelected, rotateSelected, setSelectedRotation,
     deleteElement,
     moveElementLayer, bringToFront, sendToBack,
   };

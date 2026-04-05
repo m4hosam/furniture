@@ -4,20 +4,24 @@ const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg focus:bord
 const btnSecondary = 'flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg text-xs border border-slate-200 font-medium transition-all';
 const btnDanger = 'flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 py-2 px-3 rounded-lg text-xs border border-red-200 font-medium transition-all';
 
+const ROTATION_PRESETS = [0, 45, 90, 135, 180];
+
 /**
  * Properties panel for the currently selected element.
- * Shows name, parent room, dimensions, and action buttons.
+ * Shows name, parent room, dimensions, rotation controls, and action buttons.
  */
 export function PropertiesPanel({
   selectedEl,
   rooms,
   onUpdate,
   onRotate,
+  onSetRotation,
   onDelete,
   onBringToFront,
   onSendToBack,
 }) {
   const hasEl = Boolean(selectedEl);
+  const rotation = selectedEl ? (selectedEl.rotation ?? 0) : 0;
 
   return (
     <div className={`border-t border-slate-100 pt-5 transition-opacity duration-200 ${hasEl ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
@@ -142,18 +146,82 @@ export function PropertiesPanel({
             </div>
           )}
 
+          {/* ── Rotation ─────────────────────────────────────────────────── */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-emerald-700 flex items-center gap-1.5" htmlFor="prop-rotation">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74M21 3v4h-4" />
+                </svg>
+                Rotation
+              </label>
+              <span className="text-xs text-emerald-600 font-semibold tabular-nums">{Math.round(rotation)}°</span>
+            </div>
+
+            {/* Degree input + quick ±1/±5 steppers */}
+            <div className="flex items-center gap-1.5">
+              <button
+                id="btn-rot-minus5"
+                title="−5°"
+                onClick={() => onRotate(-5)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition-colors shrink-0"
+              >−5</button>
+              <button
+                id="btn-rot-minus1"
+                title="−1°"
+                onClick={() => onRotate(-1)}
+                className="w-7 h-8 flex items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition-colors shrink-0"
+              >−1</button>
+
+              <input
+                id="prop-rotation"
+                type="number"
+                min={0}
+                max={360}
+                step={1}
+                value={Math.round(rotation)}
+                onChange={(e) => onSetRotation(Number(e.target.value))}
+                className="flex-1 min-w-0 px-2 py-1.5 text-sm font-bold text-center text-emerald-700 tabular-nums
+                  border border-emerald-200 rounded-lg bg-white
+                  focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+              />
+
+              <button
+                id="btn-rot-plus1"
+                title="+1°"
+                onClick={() => onRotate(1)}
+                className="w-7 h-8 flex items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition-colors shrink-0"
+              >+1</button>
+              <button
+                id="btn-rot-plus5"
+                title="+5°"
+                onClick={() => onRotate(5)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition-colors shrink-0"
+              >+5</button>
+            </div>
+
+            {/* Preset snaps */}
+            <div className="flex gap-1.5 flex-wrap">
+              {ROTATION_PRESETS.map((deg) => (
+                <button
+                  key={deg}
+                  id={`btn-rot-preset-${deg}`}
+                  onClick={() => onSetRotation(deg)}
+                  className={`flex-1 min-w-0 py-1 rounded-lg text-[11px] font-semibold border transition-all
+                    ${Math.round(rotation) === deg
+                      ? 'bg-emerald-600 border-emerald-700 text-white'
+                      : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                >
+                  {deg}°
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-2 mt-1">
-            {selectedEl.shape === 'rect' && (
-              <button id="btn-rotate" onClick={onRotate} className={btnSecondary}>
-                ↻ Rotate 90°
-              </button>
-            )}
-            <button
-              id="btn-delete"
-              onClick={() => onDelete(selectedEl.id)}
-              className={`${selectedEl.shape === 'rect' ? '' : 'col-span-2'} ${btnDanger}`}
-            >
+            <button id="btn-delete" onClick={() => onDelete(selectedEl.id)} className={`col-span-2 ${btnDanger}`}>
               ✕ Delete Item
             </button>
             <button id="btn-bring-front" onClick={() => onBringToFront(selectedEl.id)} className={btnSecondary}>

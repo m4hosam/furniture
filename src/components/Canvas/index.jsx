@@ -16,7 +16,7 @@ const ZOOM_STEP = 0.1;
 export function Canvas({ apartment, elements, setElements, selectedId, setSelectedId }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
-  const { handlePointerDown, handlePointerMove, handlePointerUp, axisLock, dragInfo } = useDrag(elements, setElements, svgRef);
+  const { handlePointerDown, handlePointerMove, handlePointerUp, axisLock, dragInfo, liveRotation } = useDrag(elements, setElements, svgRef);
   const [showRulers, setShowRulers] = useState(true);
   const [zoom, setZoom] = useState(1);
 
@@ -25,6 +25,9 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
 
   const onVertexPointerDown = (e, dragType, id, vIndex) =>
     handlePointerDown(e, dragType, id, setSelectedId, vIndex);
+
+  const onRotateHandlePointerDown = (e, dragType, id) =>
+    handlePointerDown(e, dragType, id, setSelectedId);
 
   // ── Ctrl+Scroll zoom ──────────────────────────────────────────────────────
   const handleWheel = useCallback((e) => {
@@ -136,6 +139,26 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
         )}
       </div>
 
+      {/* ── Rotation Badge ───────────────────────────────────────────────── */}
+      <div
+        id="rotation-badge"
+        className={`
+          absolute bottom-16 right-4 z-20
+          flex items-center gap-2 px-3 py-1.5 rounded-xl
+          text-sm font-bold shadow-xl border
+          pointer-events-none select-none
+          transition-all duration-100
+          ${liveRotation !== null
+            ? 'opacity-100 scale-100 bg-orange-500 border-orange-600 text-white shadow-orange-500/40'
+            : 'opacity-0 scale-90 bg-white border-slate-200 text-slate-700'}
+        `}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74M21 3v4h-4" />
+        </svg>
+        {liveRotation !== null ? `${Math.round(liveRotation)}°` : ''}
+      </div>
+
       {/* ── Zoom Controls ───────────────────────────────────────────────── */}
       <div
         className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-white/90 border border-slate-200 rounded-xl shadow-lg px-1 py-1"
@@ -192,8 +215,10 @@ export function Canvas({ apartment, elements, setElements, selectedId, setSelect
             isSelected={selectedId === el.id}
             onPointerDown={onElementPointerDown}
             onVertexPointerDown={onVertexPointerDown}
+            onRotateHandlePointerDown={onRotateHandlePointerDown}
             activeVertexIndex={dragInfo?.dragType === 'vertex' && dragInfo?.id === el.id ? dragInfo.vIndex : null}
             axisLock={dragInfo?.id === el.id ? axisLock : null}
+            isRotating={dragInfo?.dragType === 'rotate' && dragInfo?.id === el.id}
           />
         ))}
 

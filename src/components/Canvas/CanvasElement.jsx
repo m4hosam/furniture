@@ -25,7 +25,7 @@ export function CanvasElement({
   axisLock,
   isRotating,
 }) {
-  const { fill, stroke, strokeWidth } = getElementStyle(el.type);
+  const { fill, stroke, strokeWidth } = getElementStyle(el);
   const rotation = el.rotation ?? 0;
 
   // Centre of this element (LOCAL coords for the rotation pivot)

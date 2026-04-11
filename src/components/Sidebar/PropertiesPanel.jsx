@@ -1,4 +1,5 @@
 import React from 'react';
+import { FURNITURE_COLORS } from '../../utils/geometry';
 
 const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all bg-white';
 const btnSecondary = 'flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg text-xs border border-slate-200 font-medium transition-all';
@@ -143,6 +144,92 @@ export function PropertiesPanel({
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Furniture Colour & Opacity ─────────────────────────────── */}
+          {selectedEl.type === 'furniture' && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-3">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <circle cx="12" cy="12" r="4"/>
+                </svg>
+                Colour &amp; Opacity
+              </h3>
+
+              {/* Colour Swatches */}
+              <div className="grid grid-cols-5 gap-1.5">
+                {FURNITURE_COLORS.map((c) => {
+                  const isActive = (selectedEl.color ?? 'sky') === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      id={`btn-color-${c.id}`}
+                      title={c.label}
+                      onClick={() => onUpdate('color', c.id)}
+                      className={`relative w-full aspect-square rounded-lg border-2 transition-all focus:outline-none ${
+                        isActive
+                          ? 'border-slate-800 scale-110 shadow-md'
+                          : 'border-transparent hover:scale-105 hover:border-slate-400'
+                      }`}
+                      style={{ backgroundColor: c.hex }}
+                    >
+                      {isActive && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Colour name label */}
+              <p className="text-[11px] text-slate-500 text-center -mt-1">
+                {FURNITURE_COLORS.find((c) => c.id === (selectedEl.color ?? 'sky'))?.label ?? 'Sky Blue'}
+              </p>
+
+              {/* Opacity Slider */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-500" htmlFor="prop-opacity">Opacity</label>
+                  <span className="text-xs font-bold text-slate-700 tabular-nums">
+                    {Math.round((selectedEl.opacity ?? 0.9) * 100)}%
+                  </span>
+                </div>
+                <input
+                  id="prop-opacity"
+                  type="range"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  value={selectedEl.opacity ?? 0.9}
+                  onChange={(e) => onUpdate('opacity', parseFloat(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer
+                    [&::-webkit-slider-runnable-track]:rounded-full
+                    [&::-webkit-slider-runnable-track]:h-2
+                    [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-4
+                    [&::-webkit-slider-thumb]:h-4
+                    [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-white
+                    [&::-webkit-slider-thumb]:border-2
+                    [&::-webkit-slider-thumb]:border-slate-400
+                    [&::-webkit-slider-thumb]:shadow-sm
+                    [&::-webkit-slider-thumb]:-mt-1"
+                  style={{
+                    background: (() => {
+                      const c = FURNITURE_COLORS.find((col) => col.id === (selectedEl.color ?? 'sky'));
+                      const hex = c ? c.hex : '#3b82f6';
+                      const pct = Math.round((selectedEl.opacity ?? 0.9) * 100);
+                      return `linear-gradient(to right, ${hex} 0%, ${hex} ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`;
+                    })()
+                  }}
+                />
               </div>
             </div>
           )}

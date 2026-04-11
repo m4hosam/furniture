@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getRoomCenter, rotatePointAroundCenter } from '../utils/geometry';
 
 /**
  * Encapsulates the SVG pointer drag engine.
@@ -83,11 +84,27 @@ export function useDrag(elements, setElements, svgRef) {
         const { cx, cy } = getElementCenter(el);
         const startAngle = Math.atan2(coords.y - cy, coords.x - cx) * (180 / Math.PI);
         const startRotation = el.rotation ?? 0;
+        // Snapshot children of this element (for rooms) so we can orbit them
+        const roomChildren = el.type === 'room'
+          ? elements
+              .filter((c) => c.parentId === id && c.shape === 'rect')
+              .map((c) => ({
+                id: c.id,
+                startX: c.x,
+                startY: c.y,
+                startRotation: c.rotation ?? 0,
+                w: c.w,
+                h: c.h,
+              }))
+          : [];
+        const roomCenter = el.type === 'room' ? getRoomCenter(el) : null;
         setDragInfo({
           dragType, id,
           cx, cy,
           startAngle,
           startRotation,
+          roomChildren,
+          roomCenter,
         });
         setAxisLock(null);
         setLiveRotation(startRotation);
@@ -118,7 +135,7 @@ export function useDrag(elements, setElements, svgRef) {
 
     // ── Rotate drag ───────────────────────────────────────────────────────
     if (dragInfo.dragType === 'rotate') {
-      const { cx, cy, startAngle, startRotation } = dragInfo;
+      const { cx, cy, startAngle, startRotation, roomChildren, roomCenter } = dragInfo;
       const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) * (180 / Math.PI);
       let delta = currentAngle - startAngle;
       let newRotation = startRotation + delta;
@@ -130,12 +147,34 @@ export function useDrag(elements, setElements, svgRef) {
 
       // Normalise to [0, 360)
       newRotation = ((newRotation % 360) + 360) % 360;
+      const rotDelta = newRotation - startRotation; // effective delta after snapping
       setLiveRotation(newRotation);
 
       setElements((prev) =>
-        prev.map((el) =>
-          el.id === dragInfo.id ? { ...el, rotation: +newRotation.toFixed(1) } : el
-        )
+        prev.map((el) => {
+          if (el.id === dragInfo.id) {
+            return { ...el, rotation: +newRotation.toFixed(1) };
+          }
+          // Orbit snapshotted room children around the room center
+          if (roomCenter && roomChildren.length > 0) {
+            const childSnap = roomChildren.find((c) => c.id === el.id);
+            if (childSnap) {
+              const childCenter = {
+                x: childSnap.startX + childSnap.w / 2,
+                y: childSnap.startY + childSnap.h / 2,
+              };
+              const rotated = rotatePointAroundCenter(childCenter, roomCenter, rotDelta);
+              const newChildRot = (((childSnap.startRotation + rotDelta) % 360) + 360) % 360;
+              return {
+                ...el,
+                x: +(rotated.x - childSnap.w / 2).toFixed(2),
+                y: +(rotated.y - childSnap.h / 2).toFixed(2),
+                rotation: +newChildRot.toFixed(1),
+              };
+            }
+          }
+          return el;
+        })
       );
       return;
     }

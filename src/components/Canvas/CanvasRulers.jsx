@@ -97,54 +97,68 @@ function DimLabel({ x1, y1, x2, y2, offset, label }) {
 
 /**
  * Renders dimension rulers for a rectangular room element.
- * Draws rulers on all four sides outside the rect.
+ * Draws rulers on all four sides outside the rect, rotated with the room.
  */
 function RectRulers({ el }) {
   const { x, y, w, h } = el;
-  const OFF = 22; // how far from the wall the ruler sits
+  const rotation = el.rotation ?? 0;
+  // Pivot = centre of the rect (matches CanvasElement's rotate pivot)
+  const cx = w / 2;
+  const cy = h / 2;
+  const OFF = 22;
 
   return (
-    <>
+    // Mirror the exact same transform as CanvasElement so rulers rotate with the room
+    <g transform={`translate(${x}, ${y}) rotate(${rotation}, ${cx}, ${cy})`}>
       {/* Top wall — width */}
-      <DimLabel x1={x} y1={y} x2={x + w} y2={y} offset={-OFF} label={fmtCm(w)} />
+      <DimLabel x1={0} y1={0} x2={w} y2={0} offset={-OFF} label={fmtCm(w)} />
       {/* Bottom wall — width */}
-      <DimLabel x1={x} y1={y + h} x2={x + w} y2={y + h} offset={OFF} label={fmtCm(w)} />
+      <DimLabel x1={0} y1={h} x2={w} y2={h} offset={OFF} label={fmtCm(w)} />
       {/* Left wall — height */}
-      <DimLabel x1={x} y1={y} x2={x} y2={y + h} offset={-OFF} label={fmtCm(h)} />
+      <DimLabel x1={0} y1={0} x2={0} y2={h} offset={-OFF} label={fmtCm(h)} />
       {/* Right wall — height */}
-      <DimLabel x1={x + w} y1={y} x2={x + w} y2={y + h} offset={OFF} label={fmtCm(h)} />
-    </>
+      <DimLabel x1={w} y1={0} x2={w} y2={h} offset={OFF} label={fmtCm(h)} />
+    </g>
   );
 }
 
 /**
  * Renders dimension rulers for a polygon room element.
- * Draws a ruler label on each edge of the polygon.
+ * Draws a ruler label on each edge of the polygon, rotated with the room.
  */
 function PolygonRulers({ el }) {
   const { x: ox, y: oy, points } = el;
+  const rotation = el.rotation ?? 0;
   const OFF = 20;
 
+  // Polygon pivot = bounding-box centroid of points (matches CanvasElement)
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  points.forEach((p) => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+  const pcx = (minX + maxX) / 2;
+  const pcy = (minY + maxY) / 2;
+
   return (
-    <>
+    <g transform={`translate(${ox}, ${oy}) rotate(${rotation}, ${pcx}, ${pcy})`}>
       {points.map((p, i) => {
         const next = points[(i + 1) % points.length];
-        // Convert relative points to absolute SVG coordinates
-        const ax1 = ox + p.x, ay1 = oy + p.y;
-        const ax2 = ox + next.x, ay2 = oy + next.y;
-        const edgeLen = Math.sqrt((ax2 - ax1) ** 2 + (ay2 - ay1) ** 2);
-        if (edgeLen < 10) return null; // skip degenerate edges
+        const edgeLen = Math.sqrt((next.x - p.x) ** 2 + (next.y - p.y) ** 2);
+        if (edgeLen < 10) return null;
         return (
           <DimLabel
             key={i}
-            x1={ax1} y1={ay1}
-            x2={ax2} y2={ay2}
+            x1={p.x} y1={p.y}
+            x2={next.x} y2={next.y}
             offset={OFF}
             label={fmtCm(edgeLen)}
           />
         );
       })}
-    </>
+    </g>
   );
 }
 

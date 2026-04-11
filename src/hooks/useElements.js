@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { generateId } from '../utils/geometry';
+import { generateId, getRoomCenter, rotatePointAroundCenter } from '../utils/geometry';
 
 const STORAGE_KEY = 'apartmentElements';
 
@@ -90,26 +90,72 @@ export function useElements() {
 
   /**
    * Rotate selected element by `delta` degrees (default 90).
-   * Also works as the quick 90° button when called with no argument.
+   * When the selected element is a room, children are orbited around the
+   * room's centre by the same delta and their own rotation is updated too.
    */
   const rotateSelected = (delta = 90) => {
-    setElements((prev) =>
-      prev.map((el) =>
-        el.id === selectedId
-          ? { ...el, rotation: +(((( el.rotation ?? 0) + delta) % 360 + 360) % 360).toFixed(1) }
-          : el
-      )
-    );
+    setElements((prev) => {
+      const selected = prev.find((el) => el.id === selectedId);
+      if (!selected) return prev;
+
+      const newRot = +(((( selected.rotation ?? 0) + delta) % 360 + 360) % 360).toFixed(1);
+
+      if (selected.type !== 'room') {
+        return prev.map((el) => el.id === selectedId ? { ...el, rotation: newRot } : el);
+      }
+
+      // Room — orbit children around room centre
+      const center = getRoomCenter(selected);
+      return prev.map((el) => {
+        if (el.id === selectedId) return { ...el, rotation: newRot };
+        if (el.parentId === selectedId && el.shape === 'rect') {
+          const childCenter = { x: el.x + el.w / 2, y: el.y + el.h / 2 };
+          const rotated = rotatePointAroundCenter(childCenter, center, delta);
+          return {
+            ...el,
+            x: +(rotated.x - el.w / 2).toFixed(2),
+            y: +(rotated.y - el.h / 2).toFixed(2),
+            rotation: +(((( el.rotation ?? 0) + delta) % 360 + 360) % 360).toFixed(1),
+          };
+        }
+        return el;
+      });
+    });
   };
 
-  /** Set the rotation of the selected element to an exact degree value. */
+  /**
+   * Set the rotation of the selected element to an exact degree value.
+   * When the selected element is a room, children are orbited by the delta
+   * between the old and new rotation angles.
+   */
   const setSelectedRotation = (deg) => {
     const normalised = +((((Number(deg)) % 360) + 360) % 360).toFixed(1);
-    setElements((prev) =>
-      prev.map((el) =>
-        el.id === selectedId ? { ...el, rotation: normalised } : el
-      )
-    );
+    setElements((prev) => {
+      const selected = prev.find((el) => el.id === selectedId);
+      if (!selected) return prev;
+
+      if (selected.type !== 'room') {
+        return prev.map((el) => el.id === selectedId ? { ...el, rotation: normalised } : el);
+      }
+
+      // Room — compute delta and orbit children
+      const delta = normalised - (selected.rotation ?? 0);
+      const center = getRoomCenter(selected);
+      return prev.map((el) => {
+        if (el.id === selectedId) return { ...el, rotation: normalised };
+        if (el.parentId === selectedId && el.shape === 'rect') {
+          const childCenter = { x: el.x + el.w / 2, y: el.y + el.h / 2 };
+          const rotated = rotatePointAroundCenter(childCenter, center, delta);
+          return {
+            ...el,
+            x: +(rotated.x - el.w / 2).toFixed(2),
+            y: +(rotated.y - el.h / 2).toFixed(2),
+            rotation: +(((( el.rotation ?? 0) + delta) % 360 + 360) % 360).toFixed(1),
+          };
+        }
+        return el;
+      });
+    });
   };
 
   // ── DELETE ───────────────────────────────────────────────────────────────────

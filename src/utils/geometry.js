@@ -17,6 +17,35 @@ export const getPolygonCenter = (points) => {
 };
 
 /**
+ * Returns the canvas-space center {cx, cy} of a room element.
+ * Handles both rect and polygon shapes.
+ */
+export const getRoomCenter = (room) => {
+  if (room.shape === 'rect') {
+    return { cx: room.x + room.w / 2, cy: room.y + room.h / 2 };
+  }
+  // polygon — bounding-box centroid of points, offset by room's group origin
+  const c = getPolygonCenter(room.points);
+  return { cx: room.x + c.cx, cy: room.y + c.cy };
+};
+
+/**
+ * Rotates a canvas-space point around a pivot by angleDeg degrees.
+ * Returns the new {x, y}.
+ */
+export const rotatePointAroundCenter = (point, center, angleDeg) => {
+  const rad = angleDeg * (Math.PI / 180);
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = point.x - center.cx;
+  const dy = point.y - center.cy;
+  return {
+    x: center.cx + dx * cos - dy * sin,
+    y: center.cy + dx * sin + dy * cos,
+  };
+};
+
+/**
  * Returns fill / stroke / strokeWidth style values for a given element type.
  * Centralises all visual-style decisions in one place.
  */
